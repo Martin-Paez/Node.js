@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Mi aplicación</title>
+  </head>
+  <body>
+    <a href="pag.html">Link</a><br><br>
+    <button onclick="getHTTP(); getJSON();">LDR</button><br><br>
+    <div id="ldr"></div>
+    <script>
+      function getJSON() {
+        fetch('http://localhost:3000/sql/iot/ldr')
+          .then(response => response.json())
+          .then(data => {
+            const table = document.createElement('table');
+            const thead = document.createElement('thead');
+            const tbody = document.createElement('tbody');
+
+            const tr = document.createElement('tr');
+            for (const field in data[0]) {
+              const th = document.createElement('th');
+              th.textContent = field;
+              tr.appendChild(th);
+            }
+            thead.appendChild(tr);
+
+            data.forEach(record => {
+              const tr = document.createElement('tr');
+              for (const field in record) {
+                const td = document.createElement('td');
+                td.textContent = record[field];
+                tr.appendChild(td);
+              }
+              tbody.appendChild(tr);
+            });
+            table.appendChild(thead);
+            table.appendChild(tbody);
+            document.getElementById("ldr").appendChild(table);
+          })
+          .catch(error => {
+            console.error('Solicitud GET fallida', error);
+          });
+      }
+      function getHTTP() {
+        fetch('http://localhost:3000/sql/iot/ldr')
+          .then(response => response.text())
+          .then(html => {
+            document.getElementById("ldr").innerHTML = html;
+          })
+          .catch(error => {
+            console.error('Solicitud GET fallida', error);
+          });
+      }
+    </script>
+  </body>
+</html>
