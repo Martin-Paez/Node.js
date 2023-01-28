@@ -17,14 +17,16 @@ const options = {
 var server = https.createServer(options, app);
 var port = normalizePort(process.env.PORT || '443');
 server.listen(port);
-server.on('error', onError);
-server.on('listening', onListening);
-
 
 /* Redireccion HTTP hacia HTTPS*/
 app.listen(3000);
 app.use(redirectSsl);
 debug("Escuchando el puerto 3000 y redireccionando hacia https");
+
+
+//Imprimir por consola los eventos
+server.on('error', onError);
+server.on('listening', onListening);
 
 
 /**
