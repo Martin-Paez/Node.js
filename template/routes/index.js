@@ -3,8 +3,7 @@ const cheerio = require('cheerio');
 var debug = require('debug')('express:server');
 var path = require('path');
 const fs = require('fs');
-const klaw = require('klaw')
-const fg = require('fast-glob');
+const ss = require('../bin/serveAndSearch');
 
 var router = express.Router();
 
@@ -19,91 +18,11 @@ var router = express.Router();
  * busquedas recursivas. 
  * 
  */
-async function pathSearch(query) {
-  return (await fg(query))[0];
-}
-
-async function streamSearch(query) {
-  return await fg.stream(query);
-}
-
-function fastGlobSearch(dir, fileName, find = pathSearch) {
-  try {
-    let query = path.join(path.join(dir, '**'), fileName); 
-    forWindows = query.replace(/\\/g, '/');
-    return find(forWindows);
-  } catch (err) {
-    debug(err);
-    return null;
-  }
-}
-
-function klawSearch(dir, fileName) {
-  return new Promise((resolve, reject) => {
-    const stream = klaw(dir);
-    stream.on('data', item => {
-      if (path.basename(item.path) === fileName) {
-        resolve(item.path);
-        stream.destroy();
-      }
-    });
-    stream.on('end', () => resolve(null));
-    stream.on('error', error => reject(error));
-  });
-}
-
-function testSyncSearch(dir, fileName) {
-  return new Promise( (resolve) => { resolve(syncSearch(dir, fileName)); });
-}
-
-function syncSearch(dir, fileName) {
-  let file = null;
-  try {   
-    fs.readdirSync(dir).forEach(f => {
-        let current = path.join(dir, f);
-        if (fs.statSync(current).isDirectory()) {
-          var f = syncSearch(current, fileName);
-          if ( f !== null)
-            file = f;
-        } else if (f === fileName) {
-            file = current; 
-            debug(`Encontrado ${file}`);
-            return;
-        }
-    });
-  } catch(e) { debug(e) }
-
-  return file;
-};
-
-function sendFile(filePath, res) {
-  res.sendFile(filePath);
-}
-
-function searchAndServe(next, dir, fileName, req, res, okHandler = sendFile,
-                        errHandler = err, searchMode = pathSearch, ... args ) {
-
-  fastGlobSearch(dir, fileName, searchMode)
-  .then( rute => {
-    if (rute)
-      okHandler(rute, res, ...args);
-    else {
-      let msg = `No se encontro el archivo`;
-      errHandler(next, msg, "", req.path, dir, fileName, rute, ...args);
-    }
-  })
-  .catch( error => {
-    let msg = `Se produjo un error al buscar el archivo: error`;
-    errHandler(next, msg, error, req.path, dir, fileName, rute, ...args);
-  });
-
-}
-
 
 router.get('/', function(req, res, next) {
   let index = req.app.settings.index;
   let dir = req.app.settings.public;
-  searchAndServe(next, dir, index, req, res);
+  ss.searchAndServe(next, dir, index, req, res);
 });
 
 
@@ -123,7 +42,7 @@ router.get('/:any*/:tag(body|head)', function(req, res, next) {
   let rute = path.parse(req.path);
   rute = path.parse(rute.dir);
   rute.dir = path.join(req.app.settings.public, rute.dir);
-  searchAndServe(next, rute.dir, rute.base, req, res
+  ss.searchAndServe(next, rute.dir, rute.base, req, res
     , okHandler = (rute, res) => {
         rute = fs.readFile(rute, 'utf8', (err, html) => {
           let $ = cheerio.load(html);
@@ -162,23 +81,7 @@ router.get('/*', function(req, res, next) {
     rute.dir = path.join(req.app.settings.root, rute.dir);
   else 
     rute.dir = path.join(req.app.settings.public, rute.dir);
-  searchAndServe(next, rute.dir, rute.base, req, res); 
+  ss.searchAndServe(next, rute.dir, rute.base, req, res); 
 });
-
-
-function err(next, customMsg, errMsg, reqPath, searchOrigin, inFileName, outFileName) {
-  debug(`***********************************************\n ` +
-        `Path recibido        : "${reqPath}"            \n ` +
-        `Archivo interpretado : "${inFileName}"         \n ` +
-        `Origen de la busqueda: "${searchOrigin}"       \n ` +
-        `Archivo encontrado   : "${outFileName}"        \n ` +
-        `***********************************************   ` );
-  next(new Error(customMsg + errMsg));
-}
-
-function ignoreErr(next, ...args) {
-  next();
-}
-
 
 module.exports = router;
